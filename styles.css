@@ -853,6 +853,32 @@ input[type="range"] {
   font-size: 1.1rem;
 }
 
+.drink-character-tag {
+  font-family: var(--font-sub);
+  font-size: 0.7rem;
+  color: var(--neon-green);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+  opacity: 0.75;
+}
+
+.drink-lore {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.5;
+  border-left: 2px solid var(--border-cyber);
+  padding-left: 0.75rem;
+  margin-bottom: 1rem;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.drink-card:hover .drink-lore {
+  opacity: 1;
+}
+
 /* Contact & Proposal Form Section */
 .contact-grid {
   display: grid;
