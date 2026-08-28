@@ -197,9 +197,9 @@ function startCyberBeat() {
     // 4. Rolling Darksynth Bassline (16th note driving rhythm)
     playCyberBass(now, currentStep, phase);
 
-    // 5. Screaming Cyberpunk Lead / Arpeggio Synth (Climax Drop & Build)
+    // 5. Heavy Distorted Cyber-Punk Rock Guitar Power Riff (Replaces high synth bells with rock crunch)
     if (phase === 'CYBER CLIMAX' || (phase === 'BUILD-UP' && bar === 3)) {
-      playCyberLeadArp(now, currentStep, phase);
+      playCyberRockGuitar(now, currentStep, phase);
     }
 
     // 6. Riser FX build-up sweep (Bar 3, Step 12-15)
@@ -363,44 +363,60 @@ function playCyberBass(time, step, phase) {
   subOsc.stop(time + 0.11);
 }
 
-function playCyberLeadArp(time, step, phase) {
-  // Fast Cyberpunk 16th Arpeggio Lead (C minor Darksynth melody)
-  const arpMelody = [
-    261.63, 311.13, 392.00, 466.16, 523.25, 466.16, 392.00, 311.13,
-    261.63, 349.23, 392.00, 523.25, 622.25, 523.25, 392.00, 349.23
+function playCyberRockGuitar(time, step, phase) {
+  // Distorted Cyber-Punk Rock Power Chords (C minor / Drop D heavy crunch)
+  const powerChordRoots = [
+    130.81, 130.81, 155.56, 130.81, 174.61, 155.56, 130.81, 196.00,
+    130.81, 130.81, 233.08, 207.65, 174.61, 155.56, 130.81, 261.63
   ];
 
-  const freq = arpMelody[step % arpMelody.length];
+  const rootFreq = powerChordRoots[step % powerChordRoots.length];
+  const fifthFreq = rootFreq * 1.498; // Perfect 5th interval for heavy power chord
 
-  const osc1 = audioCtx.createOscillator();
-  const osc2 = audioCtx.createOscillator();
+  // Dual Humbucker Pickup Oscillators + Sub Cabinet resonance
+  const rootOsc = audioCtx.createOscillator();
+  const fifthOsc = audioCtx.createOscillator();
+  const subOsc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
-  const filter = audioCtx.createBiquadFilter();
+  const cabFilter = audioCtx.createBiquadFilter();
 
-  osc1.type = 'sawtooth';
-  osc2.type = 'square';
+  rootOsc.type = 'sawtooth';
+  fifthOsc.type = 'sawtooth';
+  subOsc.type = 'square';
 
-  // Detune for darksynth chorus feel
-  osc1.frequency.setValueAtTime(freq, time);
-  osc2.frequency.setValueAtTime(freq * 1.006, time);
+  rootOsc.frequency.setValueAtTime(rootFreq, time);
+  fifthOsc.frequency.setValueAtTime(fifthFreq, time);
+  subOsc.frequency.setValueAtTime(rootFreq / 2, time);
 
-  filter.type = 'bandpass';
-  filter.frequency.setValueAtTime(phase === 'CYBER CLIMAX' ? 2400 : 1300, time);
-  filter.Q.value = 4;
+  // Guitar Cabinet Emulation Filter (Punchy mids & rolled off digital fizz)
+  cabFilter.type = 'lowpass';
 
-  const vol = (phase === 'CYBER CLIMAX') ? 0.22 : 0.12;
+  // Punk rock rhythm accent: Open power chord stabs vs palm muted chugs
+  const stepInBar = step % 16;
+  const isOpenStab = (stepInBar === 0 || stepInBar === 3 || stepInBar === 6 || stepInBar === 8 || stepInBar === 12 || stepInBar === 14);
+
+  const filterCutoff = isOpenStab ? 3400 : 1200;
+  const decayTime = isOpenStab ? 0.16 : 0.07;
+  const vol = isOpenStab ? 0.28 : 0.16;
+
+  cabFilter.frequency.setValueAtTime(filterCutoff, time);
+  cabFilter.frequency.exponentialRampToValueAtTime(600, time + decayTime);
+
   gain.gain.setValueAtTime(vol, time);
-  gain.gain.exponentialRampToValueAtTime(0.005, time + 0.09);
+  gain.gain.exponentialRampToValueAtTime(0.005, time + decayTime);
 
-  osc1.connect(filter);
-  osc2.connect(filter);
-  filter.connect(gain);
+  rootOsc.connect(cabFilter);
+  fifthOsc.connect(cabFilter);
+  subOsc.connect(cabFilter);
+  cabFilter.connect(gain);
   gain.connect(masterGainNode);
 
-  osc1.start(time);
-  osc2.start(time);
-  osc1.stop(time + 0.09);
-  osc2.stop(time + 0.09);
+  rootOsc.start(time);
+  fifthOsc.start(time);
+  subOsc.start(time);
+  rootOsc.stop(time + decayTime);
+  fifthOsc.stop(time + decayTime);
+  subOsc.stop(time + decayTime);
 }
 
 function playCyberRiserFX(time, stepInBar) {
