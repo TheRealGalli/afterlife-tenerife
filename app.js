@@ -50,47 +50,13 @@ function initCalculator() {
 }
 
 /* -------------------------------------------------------------
- * 2. WEB AUDIO SYNTHESIZER (Cyberpunk Beat Engine v3 - Rock Guitar Edition)
+ * 2. WEB AUDIO SYNTHESIZER (Cyberpunk Beat Engine v4 - Rock Guitar Edition)
  * ------------------------------------------------------------- */
 let audioCtx = null;
 let isPlaying = false;
 let beatInterval = null;
 let currentStep = 0;
 let masterGainNode = null;
-let waveShaperNode = null;
-let guitarDistortionNode = null;
-
-function makeDistortionCurve(amount = 20) {
-  const k = typeof amount === 'number' ? amount : 20;
-  const n_samples = 44100;
-  const curve = new Float32Array(n_samples);
-  const deg = Math.PI / 180;
-  for (let i = 0; i < n_samples; ++i) {
-    const x = (i * 2) / n_samples - 1;
-    curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
-  }
-  return curve;
-}
-
-function getGuitarDistortionNode() {
-  if (!guitarDistortionNode && audioCtx) {
-    guitarDistortionNode = audioCtx.createWaveShaper();
-    const n_samples = 44100;
-    const curve = new Float32Array(n_samples);
-    for (let i = 0; i < n_samples; ++i) {
-      const x = (i * 2) / n_samples - 1;
-      // High-gain asymmetrical tube amp crunch response
-      if (x < 0) {
-        curve[i] = -Math.pow(Math.abs(x), 0.55);
-      } else {
-        curve[i] = Math.tanh(x * 3.5);
-      }
-    }
-    guitarDistortionNode.curve = curve;
-    guitarDistortionNode.oversample = '4x';
-  }
-  return guitarDistortionNode;
-}
 
 function initAudioPlayer() {
   const playBtn = document.getElementById('audio-play-btn');
@@ -130,17 +96,20 @@ function startCyberBeat() {
   currentStep = 0;
   const visualizerBars = document.querySelectorAll('.wave-bar');
 
-  // Master Gain & WaveShaper Setup
   if (!masterGainNode) {
     masterGainNode = audioCtx.createGain();
-    masterGainNode.gain.value = 0.85;
+    masterGainNode.gain.value = 0.9;
 
-    waveShaperNode = audioCtx.createWaveShaper();
-    waveShaperNode.curve = makeDistortionCurve(15);
-    waveShaperNode.oversample = '4x';
+    // Master Compressor Node for punchy rock mix
+    const compressor = audioCtx.createDynamicsCompressor();
+    compressor.threshold.value = -12;
+    compressor.knee.value = 8;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.005;
+    compressor.release.value = 0.1;
 
-    masterGainNode.connect(waveShaperNode);
-    waveShaperNode.connect(audioCtx.destination);
+    masterGainNode.connect(compressor);
+    compressor.connect(audioCtx.destination);
   }
 
   // 132 BPM -> ~113.6ms per 16th note step
@@ -162,7 +131,7 @@ function startCyberBeat() {
     // Dynamic Visualizer Bars animation matching music energy
     if (visualizerBars.length > 0) {
       visualizerBars.forEach((barEl, idx) => {
-        const energyMult = (phase === 'CYBER CLIMAX') ? 1.4 : (phase === 'BUILD-UP' ? 1.1 : 0.7);
+        const energyMult = (phase === 'CYBER CLIMAX') ? 1.4 : (phase === 'BUILD-UP' ? 1.1 : 0.8);
         const wave = Math.sin(currentStep * 0.4 + idx * 0.8) * 0.5 + 0.5;
         const heightVal = Math.min(100, Math.floor(wave * 75 * energyMult + 20));
         barEl.style.height = `${heightVal}%`;
@@ -208,20 +177,18 @@ function startCyberBeat() {
     // 3. Cyber Rock Hi-Hats & Cymbals
     if (phase === 'CYBER CLIMAX') {
       const isOpen = (stepInBar % 4 === 2);
-      playCyberHiHat(now, isOpen, isOpen ? 0.22 : 0.12);
+      playCyberHiHat(now, isOpen, isOpen ? 0.20 : 0.10);
     } else if (phase === 'BUILD-UP') {
-      if (stepInBar % 2 === 1) playCyberHiHat(now, false, 0.1);
+      if (stepInBar % 2 === 1) playCyberHiHat(now, false, 0.08);
     } else if (phase === 'INTRO') {
-      if (stepInBar % 4 === 2) playCyberHiHat(now, false, 0.08);
+      if (stepInBar % 4 === 2) playCyberHiHat(now, false, 0.06);
     }
 
-    // 4. Warm Driving Bassline (No high filter sweeps)
+    // 4. Warm Driving Bassline
     playCyberBass(now, currentStep, phase);
 
-    // 5. HEAVY PUNK ROCK DISTORTED GUITAR POWER RIFF (Active in Climax & Build-up)
-    if (phase === 'CYBER CLIMAX' || (phase === 'BUILD-UP' && bar === 3)) {
-      playCyberRockGuitar(now, currentStep, phase);
-    }
+    // 5. DISTORTED PUNK ROCK GUITAR POWER RIFF (Active on all steps!)
+    playCyberRockGuitar(now, currentStep, phase);
 
     currentStep = (currentStep + 1) % totalStepsInCycle;
   }, stepTimeMs);
@@ -297,7 +264,7 @@ function playCyberSnare(time, volume = 0.8) {
 }
 
 function playCyberHiHat(time, isOpen = false, volume = 0.15) {
-  const duration = isOpen ? 0.1 : 0.035;
+  const duration = isOpen ? 0.08 : 0.03;
   const bufferSize = audioCtx.sampleRate * duration;
   const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
   const data = buffer.getChannelData(0);
@@ -310,8 +277,8 @@ function playCyberHiHat(time, isOpen = false, volume = 0.15) {
 
   const filter = audioCtx.createBiquadFilter();
   filter.type = 'bandpass';
-  filter.frequency.value = 5000;
-  filter.Q.value = 1.5;
+  filter.frequency.value = 4500;
+  filter.Q.value = 1.2;
 
   const gain = audioCtx.createGain();
   gain.gain.setValueAtTime(volume, time);
@@ -326,7 +293,7 @@ function playCyberHiHat(time, isOpen = false, volume = 0.15) {
 }
 
 function playCyberBass(time, step, phase) {
-  // Heavy warm synth bass line (no high resonant filter sweeps)
+  // Deep warm synth bass line
   const bassNotes = [
     65.41, 65.41, 130.81, 65.41, 65.41, 77.78, 65.41, 130.81,
     65.41, 65.41, 130.81, 65.41, 58.27, 65.41, 77.78, 92.50
@@ -344,16 +311,14 @@ function playCyberBass(time, step, phase) {
   subOsc.type = 'square';
   subOsc.frequency.setValueAtTime(freq / 2, time);
 
-  // Warm Lowpass Filter (Keeps bass deep & dark without high ringing)
   filter.type = 'lowpass';
-  const cutoffFreq = (phase === 'CYBER CLIMAX') ? 700 : (phase === 'BUILD-UP' ? 550 : 400);
+  const cutoffFreq = (phase === 'CYBER CLIMAX') ? 600 : (phase === 'BUILD-UP' ? 500 : 380);
 
   filter.frequency.setValueAtTime(cutoffFreq, time);
-  filter.Q.value = 1.2;
+  filter.Q.value = 1.0;
 
-  // Sidechain volume ducking on kick beats
   const isKickStep = (step % 4 === 0);
-  const baseVol = isKickStep ? 0.14 : 0.30;
+  const baseVol = isKickStep ? 0.12 : 0.26;
 
   gain.gain.setValueAtTime(baseVol, time);
   gain.gain.exponentialRampToValueAtTime(0.01, time + 0.11);
@@ -370,16 +335,16 @@ function playCyberBass(time, step, phase) {
 }
 
 function playCyberRockGuitar(time, step, phase) {
-  // Distorted Punk Rock Power Chords in Drop D / C minor (heavy low-end guitar crunch)
+  // Distorted Punk Rock Power Chords (Drop D / C minor heavy crunch riff)
   const powerChordRoots = [
     65.41,  65.41,  77.78,  65.41,  87.31,  77.78,  65.41,  98.00,
     65.41,  65.41, 116.54, 103.83,  87.31,  77.78,  65.41, 130.81
   ];
 
   const rootFreq = powerChordRoots[step % powerChordRoots.length];
-  const fifthFreq = rootFreq * 1.498; // Perfect 5th interval for power chord crunch
+  const fifthFreq = rootFreq * 1.498; // Perfect 5th for power chord
 
-  // Humbucker pickup dual sawtooth oscillators + sub cabinet
+  // Dual Humbucker Sawtooth Oscillators + Sub body
   const rootOsc = audioCtx.createOscillator();
   const fifthOsc = audioCtx.createOscillator();
   const subOsc = audioCtx.createOscillator();
@@ -392,48 +357,44 @@ function playCyberRockGuitar(time, step, phase) {
   fifthOsc.frequency.setValueAtTime(fifthFreq, time);
   subOsc.frequency.setValueAtTime(rootFreq, time);
 
-  // Pre-amp Drive Gain
-  const preGain = audioCtx.createGain();
-  preGain.gain.setValueAtTime(2.8, time);
+  // Dedicated per-note Distortion Overdrive Pedal (No shared audio graph leaks!)
+  const distNode = audioCtx.createWaveShaper();
+  const n_samples = 44100;
+  const curve = new Float32Array(n_samples);
+  const driveGain = (phase === 'CYBER CLIMAX') ? 9 : 5;
+  for (let i = 0; i < n_samples; ++i) {
+    const x = (i * 2) / n_samples - 1;
+    curve[i] = Math.max(-0.75, Math.min(0.75, x * driveGain));
+  }
+  distNode.curve = curve;
+  distNode.oversample = '4x';
 
-  // Tube Amp Overdrive Pedal Node
-  const dist = getGuitarDistortionNode();
-
-  // Marshall 4x12 Cabinet Emulation Filter
+  // Marshall 4x12 Cabinet Emulation Lowpass Filter
   const cabFilter = audioCtx.createBiquadFilter();
   cabFilter.type = 'lowpass';
 
-  // Mid Scoop Filter for raw Punk Rock bite
-  const midScoop = audioCtx.createBiquadFilter();
-  midScoop.type = 'peaking';
-  midScoop.frequency.value = 750;
-  midScoop.Q.value = 1.2;
-  midScoop.gain.value = -6;
-
-  // Punk rock rhythm accent: Open power chord stabs vs palm muted chugs
+  // Rhythm accents: Open power chord stabs vs palm muted chugs
   const stepInBar = step % 16;
   const isOpenStab = (stepInBar === 0 || stepInBar === 3 || stepInBar === 6 || stepInBar === 8 || stepInBar === 12 || stepInBar === 14);
 
-  const filterCutoff = isOpenStab ? 2600 : 1100;
-  const decayTime = isOpenStab ? 0.18 : 0.08;
-  const vol = isOpenStab ? 0.42 : 0.25;
+  const filterCutoff = (phase === 'CYBER CLIMAX' && isOpenStab) ? 2800 : (isOpenStab ? 1800 : 950);
+  const decayTime = (phase === 'CYBER CLIMAX' && isOpenStab) ? 0.20 : (isOpenStab ? 0.14 : 0.08);
+  const vol = (phase === 'CYBER CLIMAX') ? (isOpenStab ? 0.48 : 0.32) : (isOpenStab ? 0.32 : 0.20);
 
   cabFilter.frequency.setValueAtTime(filterCutoff, time);
-  cabFilter.frequency.exponentialRampToValueAtTime(500, time + decayTime);
+  cabFilter.frequency.exponentialRampToValueAtTime(450, time + decayTime);
 
-  const postGain = audioCtx.createGain();
-  postGain.gain.setValueAtTime(vol, time);
-  postGain.gain.exponentialRampToValueAtTime(0.001, time + decayTime);
+  const noteGain = audioCtx.createGain();
+  noteGain.gain.setValueAtTime(vol, time);
+  noteGain.gain.exponentialRampToValueAtTime(0.001, time + decayTime);
 
-  // Routing: Oscillators -> PreGain -> Distortion -> Cabinet Filter -> Mid Scoop -> PostGain -> Master Output
-  rootOsc.connect(preGain);
-  fifthOsc.connect(preGain);
-  subOsc.connect(preGain);
-  preGain.connect(dist);
-  dist.connect(cabFilter);
-  cabFilter.connect(midScoop);
-  midScoop.connect(postGain);
-  postGain.connect(masterGainNode);
+  // Routing per note: Oscillators -> Distortion -> Cabinet Filter -> NoteGain -> Master Gain
+  rootOsc.connect(distNode);
+  fifthOsc.connect(distNode);
+  subOsc.connect(distNode);
+  distNode.connect(cabFilter);
+  cabFilter.connect(noteGain);
+  noteGain.connect(masterGainNode);
 
   rootOsc.start(time);
   fifthOsc.start(time);
