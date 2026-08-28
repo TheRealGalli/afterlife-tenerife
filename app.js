@@ -74,7 +74,6 @@ function makeDistortionCurve(amount = 20) {
 function initAudioPlayer() {
   const playBtn = document.getElementById('audio-play-btn');
   const visualizerBars = document.querySelectorAll('.wave-bar');
-  const phaseBadge = document.getElementById('audio-phase-badge');
 
   if (!playBtn) return;
 
@@ -96,10 +95,6 @@ function initAudioPlayer() {
         bar.style.height = '20%';
         bar.style.background = 'var(--neon-cyan)';
       });
-      if (phaseBadge) {
-        phaseBadge.textContent = 'STANDBY';
-        phaseBadge.className = 'phase-badge';
-      }
       isPlaying = false;
     } else {
       startCyberBeat();
@@ -112,7 +107,6 @@ function initAudioPlayer() {
 
 function startCyberBeat() {
   currentStep = 0;
-  const phaseBadge = document.getElementById('audio-phase-badge');
   const visualizerBars = document.querySelectorAll('.wave-bar');
 
   // Master Gain & WaveShaper Distortion Setup
@@ -143,22 +137,6 @@ function startCyberBeat() {
     if (bar >= 2 && bar < 4) phase = 'BUILD-UP';
     else if (bar >= 4 && bar < 7) phase = 'CYBER CLIMAX';
     else if (bar >= 7) phase = 'OUTRO / BREAK';
-
-    if (phaseBadge) {
-      if (phase === 'CYBER CLIMAX') {
-        phaseBadge.textContent = '🔥 CYBER CLIMAX';
-        phaseBadge.className = 'phase-badge climax';
-      } else if (phase === 'BUILD-UP') {
-        phaseBadge.textContent = '⚡ BUILD-UP';
-        phaseBadge.className = 'phase-badge buildup';
-      } else if (phase === 'OUTRO / BREAK') {
-        phaseBadge.textContent = '🌀 BREAKDOWN';
-        phaseBadge.className = 'phase-badge breakdown';
-      } else {
-        phaseBadge.textContent = '▶ INTRO';
-        phaseBadge.className = 'phase-badge intro';
-      }
-    }
 
     // Dynamic Visualizer Bars animation matching music energy
     if (visualizerBars.length > 0) {
