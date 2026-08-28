@@ -50,7 +50,7 @@ function initCalculator() {
 }
 
 /* -------------------------------------------------------------
- * 2. WEB AUDIO SYNTHESIZER (Cyberpunk Beat Engine v2)
+ * 2. WEB AUDIO SYNTHESIZER (Cyberpunk Beat Engine v3 - Rock Guitar Edition)
  * ------------------------------------------------------------- */
 let audioCtx = null;
 let isPlaying = false;
@@ -58,6 +58,7 @@ let beatInterval = null;
 let currentStep = 0;
 let masterGainNode = null;
 let waveShaperNode = null;
+let guitarDistortionNode = null;
 
 function makeDistortionCurve(amount = 20) {
   const k = typeof amount === 'number' ? amount : 20;
@@ -69,6 +70,26 @@ function makeDistortionCurve(amount = 20) {
     curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
   }
   return curve;
+}
+
+function getGuitarDistortionNode() {
+  if (!guitarDistortionNode && audioCtx) {
+    guitarDistortionNode = audioCtx.createWaveShaper();
+    const n_samples = 44100;
+    const curve = new Float32Array(n_samples);
+    for (let i = 0; i < n_samples; ++i) {
+      const x = (i * 2) / n_samples - 1;
+      // High-gain asymmetrical tube amp crunch response
+      if (x < 0) {
+        curve[i] = -Math.pow(Math.abs(x), 0.55);
+      } else {
+        curve[i] = Math.tanh(x * 3.5);
+      }
+    }
+    guitarDistortionNode.curve = curve;
+    guitarDistortionNode.oversample = '4x';
+  }
+  return guitarDistortionNode;
 }
 
 function initAudioPlayer() {
@@ -109,13 +130,13 @@ function startCyberBeat() {
   currentStep = 0;
   const visualizerBars = document.querySelectorAll('.wave-bar');
 
-  // Master Gain & WaveShaper Distortion Setup
+  // Master Gain & WaveShaper Setup
   if (!masterGainNode) {
     masterGainNode = audioCtx.createGain();
     masterGainNode.gain.value = 0.85;
 
     waveShaperNode = audioCtx.createWaveShaper();
-    waveShaperNode.curve = makeDistortionCurve(18);
+    waveShaperNode.curve = makeDistortionCurve(15);
     waveShaperNode.oversample = '4x';
 
     masterGainNode.connect(waveShaperNode);
@@ -157,7 +178,7 @@ function startCyberBeat() {
 
     // --- INSTRUMENT TRIGGER LOGIC ---
 
-    // 1. Cyber Kick Drum
+    // 1. Cyber Kick Drum (Heavy Punchy Rock Kick)
     let playKickNow = false;
     if (phase === 'INTRO' || phase === 'OUTRO / BREAK') {
       if (stepInBar === 0 || stepInBar === 8) playKickNow = true;
@@ -170,7 +191,7 @@ function startCyberBeat() {
       playCyberKick(now, phase === 'CYBER CLIMAX' ? 1.1 : 0.9);
     }
 
-    // 2. Cyber Snare / Electro Clap
+    // 2. Cyber Snare (Crisp Rock Snare)
     let playSnareNow = false;
     let snareVol = 0.7;
     if (phase === 'BUILD-UP') {
@@ -184,27 +205,22 @@ function startCyberBeat() {
       playCyberSnare(now, snareVol);
     }
 
-    // 3. Cyber Hi-Hats
+    // 3. Cyber Rock Hi-Hats & Cymbals
     if (phase === 'CYBER CLIMAX') {
       const isOpen = (stepInBar % 4 === 2);
-      playCyberHiHat(now, isOpen, isOpen ? 0.35 : 0.18);
+      playCyberHiHat(now, isOpen, isOpen ? 0.22 : 0.12);
     } else if (phase === 'BUILD-UP') {
-      if (stepInBar % 2 === 1) playCyberHiHat(now, false, 0.15);
+      if (stepInBar % 2 === 1) playCyberHiHat(now, false, 0.1);
     } else if (phase === 'INTRO') {
-      if (stepInBar % 4 === 2) playCyberHiHat(now, false, 0.1);
+      if (stepInBar % 4 === 2) playCyberHiHat(now, false, 0.08);
     }
 
-    // 4. Rolling Darksynth Bassline (16th note driving rhythm)
+    // 4. Warm Driving Bassline (No high filter sweeps)
     playCyberBass(now, currentStep, phase);
 
-    // 5. Heavy Distorted Cyber-Punk Rock Guitar Power Riff (Replaces high synth bells with rock crunch)
+    // 5. HEAVY PUNK ROCK DISTORTED GUITAR POWER RIFF (Active in Climax & Build-up)
     if (phase === 'CYBER CLIMAX' || (phase === 'BUILD-UP' && bar === 3)) {
       playCyberRockGuitar(now, currentStep, phase);
-    }
-
-    // 6. Riser FX build-up sweep (Bar 3, Step 12-15)
-    if (bar === 3 && stepInBar >= 12) {
-      playCyberRiserFX(now, stepInBar);
     }
 
     currentStep = (currentStep + 1) % totalStepsInCycle;
@@ -222,9 +238,9 @@ function playCyberKick(time, volume = 1.0) {
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
 
-  // Pitch sweep transient (Punchy sub drop)
-  osc.frequency.setValueAtTime(170, time);
-  osc.frequency.exponentialRampToValueAtTime(36, time + 0.12);
+  // Pitch sweep transient (Heavy punchy sub kick)
+  osc.frequency.setValueAtTime(150, time);
+  osc.frequency.exponentialRampToValueAtTime(32, time + 0.12);
 
   gain.gain.setValueAtTime(volume, time);
   gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
@@ -238,7 +254,7 @@ function playCyberKick(time, volume = 1.0) {
 
 function playCyberSnare(time, volume = 0.8) {
   // Snare Noise Body
-  const bufferSize = audioCtx.sampleRate * 0.14;
+  const bufferSize = audioCtx.sampleRate * 0.13;
   const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < bufferSize; i++) {
@@ -250,27 +266,27 @@ function playCyberSnare(time, volume = 0.8) {
 
   const noiseFilter = audioCtx.createBiquadFilter();
   noiseFilter.type = 'highpass';
-  noiseFilter.frequency.value = 1100;
+  noiseFilter.frequency.value = 1200;
 
   const noiseGain = audioCtx.createGain();
   noiseGain.gain.setValueAtTime(volume * 0.7, time);
-  noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.14);
+  noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.13);
 
   noise.connect(noiseFilter);
   noiseFilter.connect(noiseGain);
   noiseGain.connect(masterGainNode);
 
   noise.start(time);
-  noise.stop(time + 0.14);
+  noise.stop(time + 0.13);
 
-  // Snare Tone Body
+  // Snare Body Tone
   const toneOsc = audioCtx.createOscillator();
   const toneGain = audioCtx.createGain();
   toneOsc.type = 'triangle';
-  toneOsc.frequency.setValueAtTime(230, time);
-  toneOsc.frequency.exponentialRampToValueAtTime(85, time + 0.08);
+  toneOsc.frequency.setValueAtTime(210, time);
+  toneOsc.frequency.exponentialRampToValueAtTime(90, time + 0.08);
 
-  toneGain.gain.setValueAtTime(volume * 0.6, time);
+  toneGain.gain.setValueAtTime(volume * 0.5, time);
   toneGain.gain.exponentialRampToValueAtTime(0.01, time + 0.08);
 
   toneOsc.connect(toneGain);
@@ -280,8 +296,8 @@ function playCyberSnare(time, volume = 0.8) {
   toneOsc.stop(time + 0.08);
 }
 
-function playCyberHiHat(time, isOpen = false, volume = 0.2) {
-  const duration = isOpen ? 0.12 : 0.04;
+function playCyberHiHat(time, isOpen = false, volume = 0.15) {
+  const duration = isOpen ? 0.1 : 0.035;
   const bufferSize = audioCtx.sampleRate * duration;
   const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
   const data = buffer.getChannelData(0);
@@ -293,8 +309,9 @@ function playCyberHiHat(time, isOpen = false, volume = 0.2) {
   noise.buffer = buffer;
 
   const filter = audioCtx.createBiquadFilter();
-  filter.type = 'highpass';
-  filter.frequency.value = 7500;
+  filter.type = 'bandpass';
+  filter.frequency.value = 5000;
+  filter.Q.value = 1.5;
 
   const gain = audioCtx.createGain();
   gain.gain.setValueAtTime(volume, time);
@@ -309,7 +326,7 @@ function playCyberHiHat(time, isOpen = false, volume = 0.2) {
 }
 
 function playCyberBass(time, step, phase) {
-  // Darksynth rolling bass notes in C minor (C / Eb / F / G / Bb notes with octaves)
+  // Heavy warm synth bass line (no high resonant filter sweeps)
   const bassNotes = [
     65.41, 65.41, 130.81, 65.41, 65.41, 77.78, 65.41, 130.81,
     65.41, 65.41, 130.81, 65.41, 58.27, 65.41, 77.78, 92.50
@@ -327,27 +344,16 @@ function playCyberBass(time, step, phase) {
   subOsc.type = 'square';
   subOsc.frequency.setValueAtTime(freq / 2, time);
 
-  // Dynamic Lowpass Filter Envelope
+  // Warm Lowpass Filter (Keeps bass deep & dark without high ringing)
   filter.type = 'lowpass';
-  let cutoffFreq = 450;
-  let envPeak = 1400;
-
-  if (phase === 'BUILD-UP') {
-    cutoffFreq = 650 + (step % 32) * 25;
-    envPeak = 2800;
-  } else if (phase === 'CYBER CLIMAX') {
-    cutoffFreq = 1300;
-    envPeak = 4800;
-  }
+  const cutoffFreq = (phase === 'CYBER CLIMAX') ? 700 : (phase === 'BUILD-UP' ? 550 : 400);
 
   filter.frequency.setValueAtTime(cutoffFreq, time);
-  filter.frequency.exponentialRampToValueAtTime(envPeak, time + 0.04);
-  filter.frequency.exponentialRampToValueAtTime(cutoffFreq, time + 0.1);
-  filter.Q.value = (phase === 'CYBER CLIMAX') ? 6 : 3;
+  filter.Q.value = 1.2;
 
-  // Sidechain pumping volume ducking on kick beats
+  // Sidechain volume ducking on kick beats
   const isKickStep = (step % 4 === 0);
-  const baseVol = isKickStep ? 0.16 : 0.35;
+  const baseVol = isKickStep ? 0.14 : 0.30;
 
   gain.gain.setValueAtTime(baseVol, time);
   gain.gain.exponentialRampToValueAtTime(0.01, time + 0.11);
@@ -364,52 +370,70 @@ function playCyberBass(time, step, phase) {
 }
 
 function playCyberRockGuitar(time, step, phase) {
-  // Distorted Cyber-Punk Rock Power Chords (C minor / Drop D heavy crunch)
+  // Distorted Punk Rock Power Chords in Drop D / C minor (heavy low-end guitar crunch)
   const powerChordRoots = [
-    130.81, 130.81, 155.56, 130.81, 174.61, 155.56, 130.81, 196.00,
-    130.81, 130.81, 233.08, 207.65, 174.61, 155.56, 130.81, 261.63
+    65.41,  65.41,  77.78,  65.41,  87.31,  77.78,  65.41,  98.00,
+    65.41,  65.41, 116.54, 103.83,  87.31,  77.78,  65.41, 130.81
   ];
 
   const rootFreq = powerChordRoots[step % powerChordRoots.length];
-  const fifthFreq = rootFreq * 1.498; // Perfect 5th interval for heavy power chord
+  const fifthFreq = rootFreq * 1.498; // Perfect 5th interval for power chord crunch
 
-  // Dual Humbucker Pickup Oscillators + Sub Cabinet resonance
+  // Humbucker pickup dual sawtooth oscillators + sub cabinet
   const rootOsc = audioCtx.createOscillator();
   const fifthOsc = audioCtx.createOscillator();
   const subOsc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  const cabFilter = audioCtx.createBiquadFilter();
 
   rootOsc.type = 'sawtooth';
   fifthOsc.type = 'sawtooth';
-  subOsc.type = 'square';
+  subOsc.type = 'triangle';
 
   rootOsc.frequency.setValueAtTime(rootFreq, time);
   fifthOsc.frequency.setValueAtTime(fifthFreq, time);
-  subOsc.frequency.setValueAtTime(rootFreq / 2, time);
+  subOsc.frequency.setValueAtTime(rootFreq, time);
 
-  // Guitar Cabinet Emulation Filter (Punchy mids & rolled off digital fizz)
+  // Pre-amp Drive Gain
+  const preGain = audioCtx.createGain();
+  preGain.gain.setValueAtTime(2.8, time);
+
+  // Tube Amp Overdrive Pedal Node
+  const dist = getGuitarDistortionNode();
+
+  // Marshall 4x12 Cabinet Emulation Filter
+  const cabFilter = audioCtx.createBiquadFilter();
   cabFilter.type = 'lowpass';
+
+  // Mid Scoop Filter for raw Punk Rock bite
+  const midScoop = audioCtx.createBiquadFilter();
+  midScoop.type = 'peaking';
+  midScoop.frequency.value = 750;
+  midScoop.Q.value = 1.2;
+  midScoop.gain.value = -6;
 
   // Punk rock rhythm accent: Open power chord stabs vs palm muted chugs
   const stepInBar = step % 16;
   const isOpenStab = (stepInBar === 0 || stepInBar === 3 || stepInBar === 6 || stepInBar === 8 || stepInBar === 12 || stepInBar === 14);
 
-  const filterCutoff = isOpenStab ? 3400 : 1200;
-  const decayTime = isOpenStab ? 0.16 : 0.07;
-  const vol = isOpenStab ? 0.28 : 0.16;
+  const filterCutoff = isOpenStab ? 2600 : 1100;
+  const decayTime = isOpenStab ? 0.18 : 0.08;
+  const vol = isOpenStab ? 0.42 : 0.25;
 
   cabFilter.frequency.setValueAtTime(filterCutoff, time);
-  cabFilter.frequency.exponentialRampToValueAtTime(600, time + decayTime);
+  cabFilter.frequency.exponentialRampToValueAtTime(500, time + decayTime);
 
-  gain.gain.setValueAtTime(vol, time);
-  gain.gain.exponentialRampToValueAtTime(0.005, time + decayTime);
+  const postGain = audioCtx.createGain();
+  postGain.gain.setValueAtTime(vol, time);
+  postGain.gain.exponentialRampToValueAtTime(0.001, time + decayTime);
 
-  rootOsc.connect(cabFilter);
-  fifthOsc.connect(cabFilter);
-  subOsc.connect(cabFilter);
-  cabFilter.connect(gain);
-  gain.connect(masterGainNode);
+  // Routing: Oscillators -> PreGain -> Distortion -> Cabinet Filter -> Mid Scoop -> PostGain -> Master Output
+  rootOsc.connect(preGain);
+  fifthOsc.connect(preGain);
+  subOsc.connect(preGain);
+  preGain.connect(dist);
+  dist.connect(cabFilter);
+  cabFilter.connect(midScoop);
+  midScoop.connect(postGain);
+  postGain.connect(masterGainNode);
 
   rootOsc.start(time);
   fifthOsc.start(time);
@@ -417,25 +441,6 @@ function playCyberRockGuitar(time, step, phase) {
   rootOsc.stop(time + decayTime);
   fifthOsc.stop(time + decayTime);
   subOsc.stop(time + decayTime);
-}
-
-function playCyberRiserFX(time, stepInBar) {
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.type = 'sawtooth';
-  const startFreq = 200 + (stepInBar - 12) * 160;
-  osc.frequency.setValueAtTime(startFreq, time);
-  osc.frequency.exponentialRampToValueAtTime(startFreq * 2.6, time + 0.1);
-
-  gain.gain.setValueAtTime(0.16, time);
-  gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
-
-  osc.connect(gain);
-  gain.connect(masterGainNode);
-
-  osc.start(time);
-  osc.stop(time + 0.1);
 }
 
 /* -------------------------------------------------------------
