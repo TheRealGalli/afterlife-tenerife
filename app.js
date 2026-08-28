@@ -364,35 +364,49 @@ function playCyberRockGuitar(time, step, phase) {
   const driveGain = (phase === 'CYBER CLIMAX') ? 9 : 5;
   for (let i = 0; i < n_samples; ++i) {
     const x = (i * 2) / n_samples - 1;
-    curve[i] = Math.max(-0.75, Math.min(0.75, x * driveGain));
+    curve[i] = Math.max(-0.70, Math.min(0.70, x * driveGain));
   }
   distNode.curve = curve;
   distNode.oversample = '4x';
 
-  // Marshall 4x12 Cabinet Emulation Lowpass Filter
+  // Marshall Cabinet Lowpass Filter
   const cabFilter = audioCtx.createBiquadFilter();
   cabFilter.type = 'lowpass';
+
+  // Highpass filter to eliminate sub mud
+  const highpass = audioCtx.createBiquadFilter();
+  highpass.type = 'highpass';
+  highpass.frequency.value = 180;
+
+  // Guitar Presence Peak Filter (Electric Guitar Pick Attack Bite)
+  const presence = audioCtx.createBiquadFilter();
+  presence.type = 'peaking';
+  presence.frequency.value = 2500;
+  presence.Q.value = 1.5;
+  presence.gain.value = 5; // +5dB guitar crunch presence
 
   // Rhythm accents: Open power chord stabs vs palm muted chugs
   const stepInBar = step % 16;
   const isOpenStab = (stepInBar === 0 || stepInBar === 3 || stepInBar === 6 || stepInBar === 8 || stepInBar === 12 || stepInBar === 14);
 
-  const filterCutoff = (phase === 'CYBER CLIMAX' && isOpenStab) ? 2800 : (isOpenStab ? 1800 : 950);
-  const decayTime = (phase === 'CYBER CLIMAX' && isOpenStab) ? 0.20 : (isOpenStab ? 0.14 : 0.08);
-  const vol = (phase === 'CYBER CLIMAX') ? (isOpenStab ? 0.48 : 0.32) : (isOpenStab ? 0.32 : 0.20);
+  const filterCutoff = (phase === 'CYBER CLIMAX' && isOpenStab) ? 4200 : (isOpenStab ? 3200 : 1600);
+  const decayTime = (phase === 'CYBER CLIMAX' && isOpenStab) ? 0.22 : (isOpenStab ? 0.15 : 0.08);
+  const vol = (phase === 'CYBER CLIMAX') ? (isOpenStab ? 0.50 : 0.35) : (isOpenStab ? 0.35 : 0.22);
 
   cabFilter.frequency.setValueAtTime(filterCutoff, time);
-  cabFilter.frequency.exponentialRampToValueAtTime(450, time + decayTime);
+  cabFilter.frequency.exponentialRampToValueAtTime(800, time + decayTime);
 
   const noteGain = audioCtx.createGain();
   noteGain.gain.setValueAtTime(vol, time);
   noteGain.gain.exponentialRampToValueAtTime(0.001, time + decayTime);
 
-  // Routing per note: Oscillators -> Distortion -> Cabinet Filter -> NoteGain -> Master Gain
-  rootOsc.connect(distNode);
-  fifthOsc.connect(distNode);
-  subOsc.connect(distNode);
-  distNode.connect(cabFilter);
+  // Routing per note: Oscillators -> Highpass -> Distortion -> Presence -> Cabinet Filter -> NoteGain -> Master Gain
+  rootOsc.connect(highpass);
+  fifthOsc.connect(highpass);
+  subOsc.connect(highpass);
+  highpass.connect(distNode);
+  distNode.connect(presence);
+  presence.connect(cabFilter);
   cabFilter.connect(noteGain);
   noteGain.connect(masterGainNode);
 
